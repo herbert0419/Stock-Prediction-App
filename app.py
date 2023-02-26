@@ -1,102 +1,158 @@
-# !pip install --upgrade pandas-datareader
-# !pip install --upgrade pandas
-# !pip install yfinance
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
+import seaborn as sns
 import yfinance as yf
 from sklearn.preprocessing import MinMaxScaler
-# import pandas_datareader as data
-# from keras.model import load_model
-# from tensorflow.keras.models import load_model 
-from tensorflow import keras
-import pickle
+import tensorflow as tf
+from tensorflow.keras.models import Sequential
+from tensorflow.keras.layers import Dense
+from tensorflow.keras.layers import LSTM, GRU
+from sklearn.preprocessing import MinMaxScaler
+import datetime
+# import pickle
 import streamlit as st
+import model_building as m
+import technical_analysis as t
+import matplotlib.pyplot as plt
+import mpld3
+import streamlit.components.v1 as components
+from ta.trend import MACD
+from ta.momentum import RSIIndicator
+from ta.volatility import BollingerBands
 
-st.title("Stock Predictor")
-user_input = st.text_input('Enter Stock Name', 'AAPL')
-df = yf.download(user_input, start="2010-01-01", end="2022-12-31")
 
-# Describe data
-st.subheader('Data from 2010 - 2022')
-st.write(df.describe())
+with st.sidebar:
 
-# Visualisation
+    st.markdown("# Stock Analysis & Forecasting")
+    user_input = st.text_input('Enter Stock Name', "ADANIENT.NS")
+    window = st.sidebar.slider('Select SMA Window (Days)', min_value=10, max_value=100, value=50)
+    st.markdown("### Choose Date for your anaylsis")
+    date_from = st.date_input("From",datetime.date(2020, 1, 1))
+    date_to = st.date_input("To",datetime.date(2023, 2, 25))
+    btn = st.button('Submit') 
 
-st.subheader('Closing Price vs Time chart')
-fig = plt.figure(figsize = (12,6))
-plt.plot(df['Close'])
-st.pyplot(fig)
+#adding a button
+if btn:
+    df = yf.download(user_input, start=date_from, end=date_to)
+    plotdf, future_predicted_values =m.create_model(df)
 
-st.subheader('Closing Price vs Time chart with 100 days MA')
-ma100 = df['Close'].rolling(100).mean()
-fig = plt.figure(figsize = (12,6))
-plt.plot(ma100)
-plt.plot(df['Close'])
-st.pyplot(fig)
 
-st.subheader('Closing Price vs Time chart with 100 and 200 days MA')
-ma200 = df['Close'].rolling(200).mean()
-fig = plt.figure(figsize = (12,6))
-plt.plot(ma100)
-plt.plot(ma200)
-plt.plot(df['Close'])
-st.pyplot(fig)
+    st.markdown("### Original vs predicted close price")
+    fig= plt.figure(figsize=(20,10))
+    sns.lineplot(data=plotdf)
+    st.pyplot(fig)
 
-#Splitting data into training and testing
-data_training = pd.DataFrame(df['Close'][0:int(len(df)*0.70)])
-data_testing = pd.DataFrame(df['Close'][int(len(df)*0.70):int(len(df))])
+    st.markdown("### Next 10 days forecast")
+    list_of_days = ["Day 1", "Day 2", "Day 3", "Day 4", "Day 5", "Day 6", "Day 7","Day 8", "Day 9", "Day 10"]
 
-#Scaling down the data for LSTM model
-scaler = MinMaxScaler(feature_range = (0,1))
+    for i,j in zip(st.tabs(list_of_days),range(10)):
+        with i:
+            st.write(future_predicted_values.iloc[j:j+1])
 
-data_training_array = scaler.fit_transform(data_training)
 
-# X_train = []
-# y_train = []
+    st.markdown("### Adj Close Price")
+    fig= plt.figure(figsize=(20,10))
+    t.last_2_years_price_plot(df)
+    st.pyplot(fig)
 
-# for i in range(100, data_training.shape[0]):
-#     X_train.append(data_training_array[i-100:i])
-#     y_train.append(data_training_array[i,0])
+    st.markdown("### Daily Percentage Changes")
+    fig= plt.figure(figsize=(20,10))
+    t.daily_percent_change_plot(df)
+    st.pyplot(fig)
+    
+    st.markdown("### Daily Percentage Changes Histogram")
+    fig= plt.figure(figsize=(20,10))
+    t.daily_percent_change_histogram(df)
+    st.pyplot(fig)
 
-# X_train, y_train = np.array(X_train), np.array(y_train)
+    st.markdown("### Trend Analysis")
+    fig= plt.figure(figsize=(20,10))
+    t.trend_pie_chart(df)
+    st.pyplot(fig)
 
-#Loaing the model
+    st.markdown("### Volume Plot")
+    fig= plt.figure(figsize=(20,10))
+    t.volume_plot(df)
+    st.pyplot(fig)
 
-# model = pickle.load(open('keras_model.pkl', 'rb'))
-# cv = pickle.load(open('count_vectorizer.pkl', 'rb'))
-model = keras.models.load_model('keras_model.h5')
+    st.markdown("### Volume Plot")
+    fig= plt.figure(figsize=(20,10))
+    t.correlation_plot(df)
+    st.pyplot(fig)
 
-past_100_days = data_training.tail(100)
+    st.markdown("### Volatility Plot")
+    fig= plt.figure(figsize=(20,10))
+    t.volatility_plot(df)
+    st.pyplot(fig)
 
-# final_df = past_100_days.concat(data_testing, ignore_index = True)
-final_df = pd.concat([past_100_days,data_testing], ignore_index = True)
 
-# Scaline down the test data
-input_data = scaler.transform(final_df)
+    st.markdown("# Technical Analysis")
 
-X_test = []
-y_test = [] 
+    st.markdown("## MACD Indicator")
+    
+    fig= plt.figure(figsize=(20,10))
+    t.plot_price_and_signals(t.get_macd(df),'MACD')
+    st.pyplot(fig)
 
-for i in range(100, input_data.shape[0]):
-  X_test.append(data_training_array[i-100:i])
-  y_test.append(data_training_array[i,0])
+    fig= plt.figure(figsize=(20,10))
+    t.plot_macd(df)
+    st.pyplot(fig)
 
-X_test, y_test = np.array(X_test), np.array(y_test)
+    st.write(" ***:blue[Strategy:]:***")
+    st.write(":red[Sell  Signal:] The cross over: When the MACD line is below the signal line.")
+    st.write(":green[Buy Signal:] The cross over: When the MACD line is above the signal line.")
 
-# Making predictions
-y_pred = model.predict(X_test)
+    st.markdown("## RSI Indicator")
 
-scale_factor = 1/scaler.scale_
-y_pred = y_pred *scale_factor
-y_test = y_test *scale_factor
+    fig= plt.figure(figsize=(20,10))
+    t.plot_price_and_signals(t.get_rsi(df),'RSI')
+    st.pyplot(fig)
 
-st.write(y_pred)
-st.subheader('Predictions vs Original')
-fig2 = plt.figure(figsize=(12,6))
-plt.plot(y_test, 'b', label = 'Original Price')
-plt.plot(y_pred, 'r', label = 'Predicted Price')
-plt.xlabel('Time')
-plt.ylabel('Price')
-plt.legend()
-st.pyplot(fig2)
+    fig= plt.figure(figsize=(20,10))
+    t.plot_rsi(df)
+    st.pyplot(fig)
+
+    st.write(" ***:blue[Strategy:]:***")
+    st.write(":red[Sell  Signal:] When RSI increases above 70%")
+    st.write(":green[Buy Signal:] When RSI decreases below 30%.")
+
+
+    st.markdown("## Bollinger Indicator")
+
+    fig= plt.figure(figsize=(20,10))
+    t.plot_price_and_signals(t.get_bollinger_bands(df),'Bollinger_Bands')
+    st.pyplot(fig)
+
+    fig= plt.figure(figsize=(20,10))
+    t.plot_bollinger_bands(df)
+    st.pyplot(fig)
+
+    st.write(" ***:blue[Strategy:]:***")
+    st.write(":red[Sell  Signal:] As soon as the market price touches the upper Bollinger band")
+    st.write(":green[Buy Signal:] As soon as the market price touches the lower Bollinger band")
+    
+
+    st.markdown("## SMA Indicator")
+    st.title('Simple Moving Average (SMA) Plot')
+    st.write(f'Ticker Symbol: {user_input}')
+    st.write(f'SMA Window: {window} Days')
+    fig = t.sma_plot(user_input, window)
+    st.pyplot(fig)
+    st.write(" ***:blue[Strategy:]:***")
+    st.write(":red[Sell  Signal:] If 50-day moving average < 200-day moving average, it is a bearish signal")
+    st.write(":green[Buy Signal:] If 50-day moving average > 200-day moving average, it is a bullish signal")
+
+
+    st.markdown("## EMA Indicator")
+    st.title('Exponential Moving Average (EMA) Plot')
+    st.write(f'Ticker Symbol: {user_input}')
+    fig = t.ema_plot(user_input, date_from, date_to)
+    st.pyplot(fig)
+    st.write(" ***:blue[Strategy:]:***")
+    st.write(":red[Sell  Signal:] When the 50-day EMA crosses below the 200-day EMA, it is considered a bearish signal, indicating that the stock price may continue to fall. This is because the recent prices are lower than the longer-term prices")
+    st.write(":green[Buy Signal:] When the 50-day EMA crosses above the 200-day EMA, it is considered a bullish signal, indicating that the stock price may continue to rise. This is because the recent prices are higher than the longer-term prices")
+
+else:
+    st.write('Please click on the submit to get the analysis') #displayed when the button is unclicked
+

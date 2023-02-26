@@ -1,9 +1,12 @@
 streamlit
-pandas
-numpy
+pandas==1.3.5
+numpy==1.22.4
 yfinance
 matplotlib
+seaborn==0.11.2
 scikit-learn==1.0.2
-# keras
+keras
 tensorflow==2.11.0
-pickle
+mpld3
+ta==0.10.2
+# pickle
