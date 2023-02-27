@@ -58,7 +58,7 @@ def trend(x):
     
 def trend_pie_chart(df):
     pie_label = sorted([i for i in calculated_df(df).loc[:, 'Trend'].unique()])
-    plt.pie(calculated_df(df)['Trend'].value_counts(), labels = pie_label, autopct = '%1.1f%%', radius = 2)
+    plt.pie(calculated_df(df)['Trend'].value_counts(), labels = pie_label, autopct = '%1.1f%%', radius = 1)
     plt.show()
 
 def volume_plot(df):
@@ -67,13 +67,6 @@ def volume_plot(df):
     plt.stem(calculated_data['Date'], calculated_data['Day_Perc_Change'])
     (calculated_data['Volume']/1000000).plot(figsize = (15, 7.5), color = 'green', alpha = 0.5)
     plt.show()
-
-
-def correlation_plot(df):
-    # Adj close price of all the stocks
-    combined_df = yf.download(["ADANIENT.NS","TATASTEEL.NS","PAGEIND.NS","EICHERMOT.NS","INFY.NS"], start="2010-01-01", end="2023-02-12")['Adj Close']
-    combined_df = combined_df.round(2)
-    combined_df.head()
     
 def volatility_plot(df):
     ADANI_vol = calculated_df(df)['Day_Perc_Change'].rolling(7).std()*np.sqrt(7)
@@ -213,51 +206,50 @@ def plot_bollinger_bands(company):
         plt.show()
 
 
-    
-def sma_plot(user_input, window):
-    # Download data using yfinance
-    data = yf.download(user_input, period='max')
-    # Calculate SMA using rolling window
-    sma = data['Close'].rolling(window=window).mean()
-    # Create a dataframe for buy and sell signals
-    buy_sell_df = pd.DataFrame(index=data.index)
-    buy_sell_df['SMA'] = sma
-    buy_sell_df['Close'] = data['Close']
-    buy_sell_df['Signal'] = 0.0
-    buy_sell_df['Buy'] = np.zeros(len(data))
-    buy_sell_df['Sell'] = np.zeros(len(data))
-    # Determine the buy and sell signals
-    for i in range(1, len(data)):
-        if sma[i] > data['Close'][i] and sma[i-1] <= data['Close'][i-1]:
-            buy_sell_df['Signal'][i] = 1.0
-            buy_sell_df['Buy'][i] = data['Close'][i]
-        elif sma[i] < data['Close'][i] and sma[i-1] >= data['Close'][i-1]:
-            buy_sell_df['Signal'][i] = -1.0
-            buy_sell_df['Sell'][i] = data['Close'][i]
-    # Create a plot of the stock price with SMA and buy and sell signals
-    fig, ax = plt.subplots(figsize=(20, 9))
-    ax.plot(data.index, data['Close'], label='Close')
-    ax.plot(sma.index, sma, label=f'{window} Day SMA')
-    ax.scatter(buy_sell_df.index[buy_sell_df['Signal'] == 1.0], buy_sell_df['Buy'][buy_sell_df['Signal'] == 1.0], marker='^', color='green', label='Buy')
-    ax.scatter(buy_sell_df.index[buy_sell_df['Signal'] == -1.0], buy_sell_df['Sell'][buy_sell_df['Signal'] == -1.0], marker='v', color='red', label='Sell')
-    ax.legend()
-    return fig
 
+def sma_plot(df):
+        # create 50 days simple moving average column
+    df['50_SMA'] = df['Close'].rolling(window = 50, min_periods = 1).mean()
+    # create 200 days simple moving average column
+    df['200_SMA'] = df['Close'].rolling(window = 200, min_periods = 1).mean()
+    # display first few rows
+    df['Signal'] = 0.0
+    df['Signal'] = np.where(df['50_SMA'] > df['200_SMA'], 1.0, 0.0)
+    df['Position'] = df['Signal'].diff()
+    # plot close price, short-term and long-term moving averages 
+    df['Close'].plot(color = 'k', label= 'Close Price') 
+    df['50_SMA'].plot(color = 'b',label = '50-day SMA') 
+    df['200_SMA'].plot(color = 'g', label = '200-day SMA')
+    # plot 'buy' signals
+    plt.plot(df[df['Position'] == 1].index, df['50_SMA'][df['Position'] == 1], '^', markersize = 15, color = 'g', label = 'buy')
+    # plot 'sell' signals
+    plt.plot(df[df['Position'] == -1].index, df['200_SMA'][df['Position'] == -1], 'v', markersize = 15, color = 'r', label = 'sell')
+    plt.ylabel('Price in Rupees', fontsize = 15 )
+    plt.xlabel('Date', fontsize = 15 )
+    plt.title('SMA Crossover', fontsize = 20)
+    plt.legend()
+    plt.show()
 
+def ema_plot(df):
+    # Create 50 days exponential moving average column
+    df['50_EMA'] = df['Close'].ewm(span = 50, adjust = False).mean()
+    # Create 200 days exponential moving average column
+    df['200_EMA'] = df['Close'].ewm(span = 200, adjust = False).mean()
+    # create a new column 'Signal' such that if 50-day EMA is greater   # than 200-day EMA then set Signal as 1 else 0
+    df['Signal'] = 0.0  
+    df['Signal'] = np.where(df['50_EMA'] > df['200_EMA'], 1.0, 0.0)
+    # create a new column 'Position' which is a day-to-day difference of # the 'Signal' column
+    df['Position'] = df['Signal'].diff()
+    # plot close price, short-term and long-term moving averages 
+    df['Close'].plot(color = 'k', lw = 1, label = 'Close Price')  
+    df['50_EMA'].plot(color = 'b', lw = 1, label = '50-day EMA') 
+    df['200_EMA'].plot(color = 'g', lw = 1, label = '200-day EMA')
+    # plot 'buy' and 'sell' signals
+    plt.plot(df[df['Position'] == 1].index, df['50_EMA'][df['Position'] == 1], '^', markersize = 15, color = 'g', label = 'buy')
+    plt.plot(df[df['Position'] == -1].index, df['200_EMA'][df['Position'] == -1], 'v', markersize = 15, color = 'r', label = 'sell')
+    plt.ylabel('Price in Rupees', fontsize = 15 )
+    plt.xlabel('Date', fontsize = 15 )
+    plt.title('EMA Crossover', fontsize = 20)
+    plt.legend()
+    plt.show()
 
-def ema_plot(user_input, date_from, date_to):
-    # Download data from Yahoo Finance API
-    df = yf.download(user_input, start=date_from, end=date_to)
-
-    # Compute EMA with a window of 20 days
-    ema = df['Adj Close'].ewm(span=20, adjust=False).mean()
-
-    # Create a plot of the stock price with EMA
-    fig, ax = plt.subplots(figsize=(20, 9))
-    ax.plot(df.index, df['Adj Close'], label='Close')
-    ax.plot(ema.index, ema, label='EMA')
-    ax.set_xlabel('Date')
-    ax.set_ylabel('Price')
-    ax.set_title(f'{user_input} EMA plot')
-    ax.legend()
-    return fig
