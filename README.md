@@ -3,6 +3,7 @@ This project aims to provide users with a comprehensive analysis of selected sto
 
 ## Webapp link: 
 **https://subhashdixit-stock-predictor-webapp-app-0p13xm.streamlit.app/**
+**https://herbert0419-stock-predictor-webapp-app-7q1zv3.streamlit.app/**
 
 ## Steps to run the code through localhost:
 
